@@ -1,8 +1,13 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useThree, Canvas } from 'react-three-fiber';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import * as THREE from 'three'
+import { Canvas, useThree, useFrame, useLoader } from '@react-three/fiber'
 import MersenneTwist from 'mersenne-twister';
 import { TorusKnot } from '@react-three/drei';
 import Color from 'color';
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader'
+
+
 
 /*
 Create your Custom style to be turned into a EthBlock.art BlockStyle NFT
@@ -44,6 +49,36 @@ const styleMetadata = {
 };
 
 export { styleMetadata };
+
+
+
+function Triangle({ color, ...props }) {
+  const ref = useRef()
+  const [r] = useState(() => Math.random() * 10000)
+  useFrame((_) => (ref.current.position.y = -1.75 + Math.sin(_.clock.elapsedTime + r) / 10))
+  const { paths: [path] } = useLoader(SVGLoader, '/triangle.svg') // prettier-ignore
+  const geom = useMemo(() => SVGLoader.pointsToStroke(path.subPaths[0].getPoints(), path.userData.style), [])
+  return (
+    <group ref={ref}>
+      <mesh geometry={geom} {...props}>
+        <meshBasicMaterial color={color} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+function Rig({ children }) {
+  const ref = useRef()
+  const vec = new THREE.Vector3()
+  const { camera, mouse } = useThree()
+  useFrame(() => {
+    camera.position.lerp(vec.set(mouse.x * 2, 0, 3.5), 0.05)
+    ref.current.position.lerp(vec.set(mouse.x * 1, mouse.y * 0.1, 0), 0.1)
+    ref.current.rotation.y = THREE.MathUtils.lerp(ref.current.rotation.y, (-mouse.x * Math.PI) / 20, 0.1)
+  })
+  return <group ref={ref}>{children}</group>
+}
+
 
 function Inner({
   block,
@@ -136,20 +171,22 @@ function Inner({
 
   // Render the scene
   return (
-    <group ref={group} position={[-0, 0, 0]} rotation={[0, mod2, 0]}>
-      <ambientLight intensity={1} color={color} />
-      {tori.map((sp, index) => {
-        return (
-          <group key={index} position={sp}>
-            <TorusKnot
-              args={[scale * 100, mod1 / 10, (mod2 + 0.001) * 500, mod3 * 12]}
-            >
-              <meshNormalMaterial attach="material" />
-            </TorusKnot>
-          </group>
-        );
-      })}
-    </group>
+    <>
+    <color attach="background" args={['black']} />
+      <ambientLight />
+      <Suspense fallback={null}>
+        <Rig>
+          <Triangle color="#ff2060" scale={0.009} rotation={[0, 0, Math.PI / 3]} />
+          <Triangle color="cyan" scale={0.009} position={[2, 0, -2]} rotation={[0, 0, Math.PI / 3]} />
+          <Triangle color="orange" scale={0.009} position={[-2, 0, -2]} rotation={[0, 0, Math.PI / 3]} />
+          <Triangle color="white" scale={0.009} position={[0, 2, -10]} rotation={[0, 0, Math.PI / 3]} />
+        </Rig>
+        <EffectComposer multisampling={8}>
+          <Bloom kernelSize={3} luminanceThreshold={0} luminanceSmoothing={0.4} intensity={0.6} />
+          <Bloom kernelSize={3} luminanceThreshold={0} luminanceSmoothing={0} intensity={0.5} />
+        </EffectComposer>
+      </Suspense>
+    </>
   );
 }
 
