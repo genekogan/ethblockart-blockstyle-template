@@ -80,41 +80,83 @@ function Star({ color, ...props }) {
       (ref.current.position.y = -1.75 + Math.sin(_.clock.elapsedTime + r) / 10)
   );
 
-  // this is what i want to use
-  const myCurve = new THREE.SplineCurve( [
-    new THREE.Vector2( -0.1, 0 ),
-    new THREE.Vector2( 0.29, -0.25 ),
-    new THREE.Vector2( -0.5, 0.5 ),
-    new THREE.Vector2( -0.19, .35 ),
-    new THREE.Vector2( 0, 0 ),
-    new THREE.Vector2( 0.5, -0.5 ),
-    new THREE.Vector2( 0.75, 0.75 ),
-    new THREE.Vector2( 0.1, 0 ),
-    new THREE.Vector2( -0.75, 0.79 )    
-  ] );
-  
-  // i want to use this
-  const path2 = new THREE.Curve(myCurve.getPoints(50));
-  path2.scale = 300
-  
-  // this is what actually works right now
-  const path = new CustomSinCurve( 300 );
+  const [allTubes] = useState(() => {
+    var beziers = []
+    var curves = []
 
-  const geom = useMemo(
-    () =>
-      new THREE.TubeGeometry(
-        path, 200, 20, 8, false
-      ),
-    []
-  );
+    // set parameters
+    let n, skip, verts;
+    n = parseInt(5 + 16 * Math.random());
+    do {
+      skip = [ 
+        parseInt(1 + (n-1) * Math.random()),
+        parseInt(1 + (n-1) * Math.random()), 
+        parseInt(1 + (n-1) * Math.random())
+      ];
+    } 
+    while (n % skip[2] === 0);
+
+
+    // vertices
+    verts = [];
+    for (var i = 0; i < n; i++) {
+      var ang = 2.0 * Math.PI * i / n;
+      verts.push({
+        x: 800 * Math.cos(ang),
+        y: 800 * Math.sin(ang)
+      });
+    }  
+
+    // point sets
+    var i1 = 0;
+
+    do {
+      var i2 = (i1 + skip[0]) % n;
+      var i3 = (i1 + skip[1]) % n;
+      var i4 = (i1 + skip[2]) % n;
+      
+      beziers.push(new THREE.CubicBezierCurve3(
+        new THREE.Vector3(verts[i1].x, verts[i1].y, 0),
+        new THREE.Vector3(verts[i2].x, verts[i2].y, 0),
+        new THREE.Vector3(verts[i3].x, verts[i3].y, 0),
+        new THREE.Vector3(verts[i4].x, verts[i4].y, 0)
+      ));
+
+      curves.push(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(verts[i1].x, verts[i1].y, -1),
+        new THREE.Vector3(verts[i2].x, verts[i2].y, -1),
+        new THREE.Vector3(verts[i3].x, verts[i3].y, -1),
+        new THREE.Vector3(verts[i4].x, verts[i4].y, -1)
+      ]))
+
+      i1 = i3;
+    } 
+    while (i1 !== 0); 
+    
+    return [beziers, curves]; //new THREE.CatmullRomCurve3(points2.getPoints(50));
+  })
+  
+  let beziers = allTubes[0]
+  let curves = allTubes[1]
 
   return (
     <group ref={ref}>
-      <mesh geometry={geom} {...props}>
-        <meshBasicMaterial color={color} toneMapped={false} />
-      </mesh>
+      {beziers.map((obj, i) => {
+        return (
+          <mesh
+            geometry={
+              new THREE.TubeGeometry(obj, 100, 9, 3, false)
+            }
+            {...props}
+            key={i}
+          >
+            <meshBasicMaterial color={color} toneMapped={false} />
+          </mesh>
+        );
+      })}
     </group>
   );
+
 }
 
 
