@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useThree, Canvas } from 'react-three-fiber';
-import MersenneTwist from 'mersenne-twister';
-import { TorusKnot } from '@react-three/drei';
-import Color from 'color';
+import React, { useRef } from 'react';
+import Sketch from 'react-p5';
+import MersenneTwister from 'mersenne-twister';
 
 /*
-Create your Custom style to be turned into a EthBlock.art BlockStyle NFT
+Create your Custom style to be turned into a EthBlock.art Mother NFT
 
 Basic rules:
  - use a minimum of 1 and a maximum of 4 "modifiers", modifiers are values between 0 and 1,
@@ -19,80 +17,208 @@ Basic rules:
   - color: template color argument with arbitrary default to get you started
 
 Getting started:
- - Write canvas code, consuming the block data and modifier arguments,
+ - Write p5.js code, comsuming the block data and modifier arguments,
    make it cool and use no random() internally, component must be pure, output deterministic
  - Customize the list of arguments as you wish, given the rules listed below
  - Provide a set of initial /default values for the implemented arguments, your preset.
  - Think about easter eggs / rare attributes, display something different every 100 blocks? display something unique with 1% chance?
 
-
+ - check out p5.js documentation for examples!
 */
 
-// Required style metadata
+
+
+let DEFAULT_SIZE = 500;
+const CustomStyle = ({
+  block,
+  canvasRef,
+  attributesRef,
+  width,
+  height,
+  handleResize,
+  mod1 = 0.4,
+  mod2 = 0.0,
+  mod3 = 0.0, 
+  mod4 = 0.4,
+  mod5 = 0.5
+  // fill_color = '#000000',
+  // background = '#ffffff'
+}) => {
+  const shuffleBag = useRef();
+  const hoistedValue = useRef();
+
+  const { hash } = block;
+
+  // setup() initializes p5 and the canvas element, can be mostly ignored in our case (check draw())
+  const setup = (p5, canvasParentRef) => {
+    // Keep reference of canvas element for snapshots
+    p5.createCanvas(width, height).parent(canvasParentRef);
+    canvasRef.current = p5;
+
+    attributesRef.current = () => {
+      return {
+        // This is called when the final image is generated, when creator opens the Mint NFT modal.
+        // should return an object structured following opensea/enjin metadata spec for attributes/properties
+        // https://docs.opensea.io/docs/metadata-standards
+        // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1155.md#erc-1155-metadata-uri-json-schema
+
+        attributes: [
+          {
+            display_type: 'number',
+            trait_type: 'Vertices',
+            value: hoistedValue.current, // using the hoisted value from within the draw() method, stored in the ref.
+          }
+        ],
+      };
+    };
+  };
+
+  // draw() is called right after setup and in a loop
+  // disabling the loop prevents controls from working correctly
+  // code must be deterministic so every loop instance results in the same output
+
+  // Basic example of a drawing something using:
+  // a) the block hash as initial seed (shuffleBag)
+  // b) individual transactions in a block (seed)
+  // c) custom parameters creators can customize (mod1, color1)
+  // d) final drawing reacting to screen resizing (M)
+  const draw = (p5) => {
+    let WIDTH = width;
+    let HEIGHT = height;
+    let DIM = Math.min(WIDTH, HEIGHT);
+    let M = DIM / DEFAULT_SIZE;
+
+    
+    // reset shuffle bag
+    let seed = parseInt(hash.slice(0, 16), 16);
+    shuffleBag.current = new MersenneTwister(seed);
+    // let objs = block.transactions.map((t) => {
+    //   let seed = parseInt(t.hash.slice(0, 16), 16);
+    //   return {
+    //     y: shuffleBag.current.random(),
+    //     x: shuffleBag.current.random(),
+    //     radius: seed / 1000000000000000,
+    //   };
+    // });
+
+    // create star
+    let n, skip, verts;
+    n = parseInt(5 + 16 * shuffleBag.current.random());
+    do {
+      skip = [ 
+        parseInt(1 + (n-1) * shuffleBag.current.random()),
+        parseInt(1 + (n-1) * shuffleBag.current.random()), 
+        parseInt(1 + (n-1) * shuffleBag.current.random())
+      ];
+    } 
+    while (n % skip[2] === 0);
+
+    hoistedValue.current = n;
+
+    verts = [];
+    for (var i = 0; i < n; i++) {
+      var ang = p5.lerp(0, p5.TWO_PI, i / n);
+      verts.push({
+        x: 0.333 * width * p5.cos(ang),
+        y: 0.333 * height * p5.sin(ang)
+      });
+    }  
+    
+    var hueInit = shuffleBag.current.random();
+
+    var strokeHue = parseInt(360 * ((hueInit + mod2) % 1.0));
+    var strokeSaturation = parseInt(90 + 10 * shuffleBag.current.random());
+    var strokeBrightness = parseInt(90 + 10 * shuffleBag.current.random());
+    var strokeAlpha = 0.85 + 0.13 * shuffleBag.current.random();
+
+    var fillHue = parseInt(360 * ((hueInit + 0.5 + mod3) % 1.0));
+    var fillSaturation = parseInt(60 + 40 * shuffleBag.current.random());
+    var fillBrightness = parseInt(60 + 40 * shuffleBag.current.random());
+    var fillAlpha = 0.25 + 0.15 * shuffleBag.current.random();
+
+    p5.colorMode(p5.HSB, 360, 100, 100, 1);    
+
+    p5.background(0); 
+    var rads = Math.ceil((height**2 + width**2) ** 0.5);
+    for (var r=rads; r>0; r-=5) {
+      p5.fill(fillHue, fillSaturation, p5.lerp(0.72*fillBrightness, 0, r/rads));
+      p5.noStroke();
+      p5.ellipse(width/2, height/2, r, r);
+    }
+
+    var thickness = p5.map(mod1, 0.0, 1.0, 0.1, 1.0) * DIM / 500.0;
+
+    for (var k=0; k<8; k++) {
+      if (k < 5) {
+        p5.noFill();
+        p5.stroke(strokeHue, strokeSaturation, strokeBrightness, strokeAlpha * 0.1 * (k+1));
+        p5.strokeWeight((7.0-k) * thickness);
+      }
+      else if (k == 5) {
+        p5.noStroke();
+        p5.fill(fillHue, fillSaturation, fillBrightness, fillAlpha * mod4);
+      }
+      else if (k == 6) {
+        p5.noFill();
+        p5.stroke(strokeHue, strokeSaturation, strokeBrightness, strokeAlpha*0.555);
+        p5.strokeWeight(2.0  * thickness);
+      }
+      else if (k == 7) {
+        p5.noFill();
+        p5.stroke(strokeHue, strokeSaturation, strokeBrightness, strokeAlpha);
+        p5.strokeWeight(1.0 * thickness);
+      }
+
+      p5.push();
+      p5.translate(width/2, height/2);
+      p5.rotate(0.5 * Math.PI * mod5)
+      var i1 = 0;
+      do {
+        var i2 = (i1 + skip[0]) % n;
+        var i3 = (i1 + skip[1]) % n;
+        var i4 = (i1 + skip[2]) % n;
+        p5.beginShape();
+          p5.curveVertex(verts[i1].x, verts[i1].y);
+          p5.curveVertex(verts[i2].x, verts[i2].y);
+          p5.curveVertex(verts[i3].x, verts[i3].y);
+          p5.curveVertex(verts[i4].x, verts[i4].y);
+        p5.endShape(p5.CLOSE);
+        if (k>6) {
+          p5.bezier(
+            verts[i1].x, verts[i1].y, 
+            verts[i2].x, verts[i2].y, 
+            verts[i3].x, verts[i3].y, 
+            verts[i4].x, verts[i4].y
+          );
+        }
+        i1 = i3;
+      } 
+      while (i1 !== 0); 
+
+      p5.pop();
+    }
+
+  };
+
+  return <Sketch setup={setup} draw={draw} windowResized={handleResize} />;
+};
+
+export default CustomStyle;
+
 const styleMetadata = {
-  name: '',
-  description: '',
+  name: 'Stars',
+  description: 'Everyone learns how to make the humble 5-point star in grade school, but it turns out that stars can come in all shapes and sizes. These stars experiment with number of vertices, skips, beziers, and other effects.',
   image: '',
-  creator_name: '',
+  creator_name: 'Gene Kogan',
   options: {
     mod1: 0.4,
-    mod2: 0.1,
-    mod3: 0.4,
-    color1: '#fff000',
-    background: '#000000',
+    mod2: 0.0,
+    mod3: 0.0, 
+    mod4: 0.4,
+    mod5: 0.5
+    // fill_color: '#000000',
+    // background: '#ffffff'
   },
 };
 
 export { styleMetadata };
-
-function rect(props) {
-  const { ctx, x, y, width, height, color } = props;
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, width, height);
-}
-
-const Outer = React.memo(
-  ({ canvasRef, block, width, height, mod1, mod2, background, ...props }) => {
-    const shuffleBag = useRef();
-    const hoistedValue = useRef();
-
-    useEffect(() => {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const { hash } = block;
-      const seed = parseInt(hash.slice(0, 16), 16);
-      shuffleBag.current = new MersenneTwist(seed);
-
-      ctx.clearRect(0, 0, width, height);
-      block.transactions.map((tx, i) => {
-        const color = Color([ran255(), ran255(), ran255()]).hex();
-        rect({
-          ctx,
-          color,
-          x: width * shuffleBag.current.random(),
-          y: height * shuffleBag.current.random(),
-          width: 100 * mod1,
-          height: 50 * mod2,
-        });
-      });
-
-      function ran255() {
-        return Math.floor(255 * shuffleBag.current.random());
-      }
-
-      hoistedValue.current = 42;
-    }, [canvasRef, block, mod1, mod2]);
-
-    return (
-      <canvas
-        width={width}
-        height={height}
-        style={{ width: '100%', height: '100%' }}
-        ref={canvasRef}
-        {...props}
-      />
-    );
-  }
-);
-
-export default Outer;

@@ -26,6 +26,8 @@ Getting started:
  - check out p5.js documentation for examples!
 */
 
+
+
 let DEFAULT_SIZE = 500;
 const CustomStyle = ({
   block,
@@ -34,8 +36,11 @@ const CustomStyle = ({
   width,
   height,
   handleResize,
-  luminance = 0.75,
-  opacity = 0.25
+  mod1 = 0.4,
+  mod2 = 0.0,
+  mod3 = 0.0, 
+  mod4 = 0.4,
+  mod5 = 0.5
   // fill_color = '#000000',
   // background = '#ffffff'
 }) => {
@@ -96,54 +101,52 @@ const CustomStyle = ({
     //   };
     // });
 
-    
-    
-
-
     // create star
-    let n, s, p;
+    let n, skip, verts;
     n = parseInt(5 + 16 * shuffleBag.current.random());
     do {
-      s = [ 
+      skip = [ 
         parseInt(1 + (n-1) * shuffleBag.current.random()),
         parseInt(1 + (n-1) * shuffleBag.current.random()), 
         parseInt(1 + (n-1) * shuffleBag.current.random())
       ];
     } 
-    while (n % s[2] === 0);
+    while (n % skip[2] === 0);
 
     hoistedValue.current = n;
 
-    p = [];
+    verts = [];
     for (var i = 0; i < n; i++) {
       var ang = p5.lerp(0, p5.TWO_PI, i / n);
-      p.push({
+      verts.push({
         x: 0.333 * width * p5.cos(ang),
         y: 0.333 * height * p5.sin(ang)
       });
     }  
     
-    var strokeHue = parseInt(360 * shuffleBag.current.random());
+    var hueInit = shuffleBag.current.random();
+
+    var strokeHue = parseInt(360 * ((hueInit + mod2) % 1.0));
     var strokeSaturation = parseInt(90 + 10 * shuffleBag.current.random());
     var strokeBrightness = parseInt(90 + 10 * shuffleBag.current.random());
     var strokeAlpha = 0.85 + 0.13 * shuffleBag.current.random();
 
-    var fillHue = parseInt(360 * shuffleBag.current.random());
+    var fillHue = parseInt(360 * ((hueInit + 0.5 + mod3) % 1.0));
     var fillSaturation = parseInt(60 + 40 * shuffleBag.current.random());
     var fillBrightness = parseInt(60 + 40 * shuffleBag.current.random());
-    var fillAlpha = 0.05 + 0.15 * shuffleBag.current.random();
+    var fillAlpha = 0.25 + 0.15 * shuffleBag.current.random();
 
     p5.colorMode(p5.HSB, 360, 100, 100, 1);    
 
     p5.background(0); 
     var rads = Math.ceil((height**2 + width**2) ** 0.5);
     for (var r=rads; r>0; r-=5) {
-      p5.fill(fillHue, fillSaturation, p5.lerp(0.33*fillBrightness, 0, r/rads));
+      p5.fill(fillHue, fillSaturation, p5.lerp(0.72*fillBrightness, 0, r/rads));
       p5.noStroke();
       p5.ellipse(width/2, height/2, r, r);
     }
 
-    var thickness = p5.map(luminance, 0.0, 1.0, 0.1, 1.0);
+    var thickness = p5.map(mod1, 0.0, 1.0, 0.1, 1.0) * DIM / 500.0;
 
     for (var k=0; k<8; k++) {
       if (k < 5) {
@@ -153,7 +156,7 @@ const CustomStyle = ({
       }
       else if (k == 5) {
         p5.noStroke();
-        p5.fill(fillHue, fillSaturation, fillBrightness, fillAlpha * opacity);
+        p5.fill(fillHue, fillSaturation, fillBrightness, fillAlpha * mod4);
       }
       else if (k == 6) {
         p5.noFill();
@@ -168,19 +171,25 @@ const CustomStyle = ({
 
       p5.push();
       p5.translate(width/2, height/2);
+      p5.rotate(0.5 * Math.PI * mod5)
       var i1 = 0;
       do {
-        var i2 = (i1 + s[0]) % n;
-        var i3 = (i1 + s[1]) % n;
-        var i4 = (i1 + s[2]) % n;
+        var i2 = (i1 + skip[0]) % n;
+        var i3 = (i1 + skip[1]) % n;
+        var i4 = (i1 + skip[2]) % n;
         p5.beginShape();
-          p5.curveVertex(p[i1].x, p[i1].y);
-          p5.curveVertex(p[i2].x, p[i2].y);
-          p5.curveVertex(p[i3].x, p[i3].y);
-          p5.curveVertex(p[i4].x, p[i4].y);
+          p5.curveVertex(verts[i1].x, verts[i1].y);
+          p5.curveVertex(verts[i2].x, verts[i2].y);
+          p5.curveVertex(verts[i3].x, verts[i3].y);
+          p5.curveVertex(verts[i4].x, verts[i4].y);
         p5.endShape(p5.CLOSE);
         if (k>6) {
-          p5.bezier(p[i1].x, p[i1].y, p[i2].x, p[i2].y, p[i3].x, p[i3].y, p[i4].x, p[i4].y);
+          p5.bezier(
+            verts[i1].x, verts[i1].y, 
+            verts[i2].x, verts[i2].y, 
+            verts[i3].x, verts[i3].y, 
+            verts[i4].x, verts[i4].y
+          );
         }
         i1 = i3;
       } 
@@ -198,12 +207,15 @@ export default CustomStyle;
 
 const styleMetadata = {
   name: 'Stars',
-  description: 'Everyone learns how to make 5-vertex stars in grade school, but stars come in all shapes and sizes. These stars experiment with number of vertices, skips, beziers, and other effects.',
+  description: 'Everyone learns how to make the humble 5-point star in grade school, but it turns out that stars can come in all shapes and sizes. These stars experiment with number of vertices, skips, beziers, and other effects.',
   image: '',
   creator_name: 'Gene Kogan',
   options: {
-    luminance: 0.4,
-    opacity: 0.1
+    mod1: 0.4,
+    mod2: 0.0,
+    mod3: 0.0, 
+    mod4: 0.4,
+    mod5: 0.5
     // fill_color: '#000000',
     // background: '#ffffff'
   },

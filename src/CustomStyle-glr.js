@@ -57,7 +57,7 @@ float cell (vec2 p) {
   return mod(mod(p.x * (p.x + 32. * p.y), m * floor(1.0 + 64.0 * seed) + 1.), m);
 }
 void main() {
-  float unzoom = 64.;
+  float unzoom = 4.;
   vec2 offset = vec2(-.25 * unzoom, -2.);
   vec3 c = palette(mod2 + .1 * cell(floor(uv * unzoom + offset)), vec3(.5), vec3(.5), vec3(1.), vec3(1.0, .3, .5));
   gl_FragColor = vec4(c, 1.0);
