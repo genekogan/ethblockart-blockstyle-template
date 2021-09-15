@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import useDimensions from 'react-cool-dimensions';
 import blocks from './blocks';
-import CustomStyle, { styleMetadata } from './CustomStyle-r3f';
+//import CustomStyle, { styleMetadata } from './CustomStyle';
+import CustomStyle, { styleMetadata } from './stars-r3f';
 import Sidebar from './components/Sidebar';
 import { proxy, useProxy } from 'valtio';
 import { DAppProvider, useBlockNumber, useEthers } from '@usedapp/core';
