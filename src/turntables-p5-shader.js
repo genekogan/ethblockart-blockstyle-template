@@ -84,10 +84,9 @@ const CustomStyle = ({
     this.col = col;
     this.col2 = col2;
   }
-
-
+  
   const preload = (p5) => {
-    //shady = p5.loadShader('base.vert', 'wrap.frag');
+    shady = p5.loadShader('base.vert', 'wrap.frag');
   }
   
   // setup() initializes p5 and the canvas element, can be mostly ignored in our case (check draw())
