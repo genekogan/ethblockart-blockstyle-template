@@ -1,64 +1,8 @@
 import React, { useRef } from 'react';
 import Sketch from 'react-p5';
 import MersenneTwister from 'mersenne-twister';
+import { randFloatSpread } from 'three/src/math/MathUtils';
 
-
-
-
-/*
-Create your Custom style to be turned into a EthBlock.art Mother NFT
-
-Basic rules:
- - use a minimum of 1 and a maximum of 4 "modifiers", modifiers are values between 0 and 1,
- - use a minimum of 1 and a maximum of 3 colors, the color "background" will be set at the canvas root
- - Use the block as source of entropy, no Math.random() allowed!
- - You can use a "shuffle bag" using data from the block as seed, a MersenneTwister library is provided
-
- Arguments:
-  - block: the blockData, in this example template you are given 3 different blocks to experiment with variations, check App.js to learn more
-  - mod[1-3]: template modifier arguments with arbitrary defaults to get your started
-  - color: template color argument with arbitrary default to get you started
-
-Getting started:
- - Write p5.js code, comsuming the block data and modifier arguments,
-   make it cool and use no random() internally, component must be pure, output deterministic
- - Customize the list of arguments as you wish, given the rules listed below
- - Provide a set of initial /default values for the implemented arguments, your preset.
- - Think about easter eggs / rare attributes, display something different every 100 blocks? display something unique with 1% chance?
-
- - check out p5.js documentation for examples!
-*/
-
-let pg;
-let shady;
-let rects;
-
-
-let vert_shader = 
-  'attribute vec3 aPosition;' +
-  'attribute vec2 aTexCoord;' +
-  'varying vec2 vTexCoord;' +
-  'void main() {' +
-  '  vTexCoord = aTexCoord;' +
-  '  vec4 positionVec4 = vec4(aPosition, 1.0);' +
-  '  positionVec4.xy = positionVec4.xy * 2.0 - 1.0;' +
-  '  gl_Position = positionVec4;' +
-  '}' 
-
-let frag_shader = 
-  'precision mediump float;' +
-  'varying vec2 vTexCoord;' +
-  'uniform sampler2D tex0;' +
-  'void main() {' +
-  '  vec2 p = -1.0 + 2.0 * vTexCoord.xy;' +
-  '  float a = atan(p.y,p.x);' +
-  '  float r = sqrt(dot(p,p));' +
-  '  vec2 uv;' +
-  '  uv.x = (a + 3.14159265359)/6.28318530718;' +
-  '  uv.y = r / sqrt(2.0);' +
-  '  vec3 col = texture2D(tex0, uv).rgb;' +
-  '  gl_FragColor = vec4(col, 1.0);' +
-  '}'
 
 
 let DEFAULT_SIZE = 500;
@@ -70,36 +14,98 @@ const CustomStyle = ({
   height,
   handleResize,
   mod1 = 0.5, // Example: replace any number in the code with mod1, mod2, or color values
-  mod2 = 0.5
+  mod2 = 0.0
 }) => {
   const shuffleBag = useRef();
-  const hoistedValue = useRef();  
+  const hoistedValue = useRef();
+
   const { hash } = block;
 
-  function Rect(x, y, w, h, col, col2) {
-    this.x = x;
-    this.y = y;
-    this.w = w;
-    this.h = h;
+  function rand(val1, val2) {
+    return val1 + (val2 - val1) * shuffleBag.current.random();
+  }
+
+  function dice(prob) {
+    return shuffleBag.current.random() < prob;
+  }
+
+  function colorToHTML(col, alpha) {
+    if (alpha === undefined) {
+      return 'hsl('+Math.floor(col[0])+','+Math.floor(col[1])+'%,'+Math.floor(col[2])+'%)';
+    } else {
+      return 'hsla('+Math.floor(col[0])+','+Math.floor(col[1])+'%,'+Math.floor(col[2])+'%, '+alpha+')';
+    }
+  }
+
+  function complementColor(col) {
+    return [(col[0] + 180) % 360, col[2], col[1]]
+  }
+
+  function perturbColor(col, h, s, b) {
+    var h2 = (col[0] + rand(-h, h) + 360) % 360;
+    var s2 = (col[1] + rand(-s, s) + 100) % 100;
+    var b2 = (col[2] + rand(-b, b) + 100) % 100;
+    return [h2, s2, b2];
+  }
+
+  function map(input, from1, to1, from2, to2) {
+    return from2 + (to2-from2) * (input-from1) / (to1-from1);
+  }
+
+  function Shard(col, gen, radialThresh, gradientRate, hueVary, satVary, brightVary) {
+    this.gen = gen;
     this.col = col;
-    this.col2 = col2;
-  }
+    
+    let hueMargin = rand(-5, 5);
+    let satMargin = rand(10, 25);
+    let brightMargin = rand(10, 25);
+    
+    this.col2 = [
+      col[0] + hueMargin,
+      col[1] > 50 ? col[1] - satMargin : col[1] + satMargin, 
+      col[2] > 50 ? col[2] - brightMargin : col[2] + brightMargin
+    ];
 
+    if (dice(0.5)) {
+      let colTemp = this.col;
+      this.col = this.col2;
+      this.col2 = colTemp;
+    }
 
-  const preload = (p5) => {
-    //shady = p5.loadShader('base.vert', 'wrap.frag');
-  }
+    this.gradient = dice(gradientRate);
+    this.mint = 0.40 * mod1;
+    this.maxt = 1.0 - 0.4 * mod1;
+    this.speed = dice(0.5) ? 1.0 : -1.0; 
+    this.off = rand(0, 100);
+    this.radial = dice(radialThresh);
+
+    if (this.gen > 0) {
+      let col1 = perturbColor(this.col, hueVary, satVary, brightVary);
+      let col2 = perturbColor(this.col, hueVary, satVary, brightVary);
+      this.child1 = new Shard(col1, this.gen-1, radialThresh, gradientRate, hueVary, satVary, brightVary);
+      this.child2 = new Shard(col2, this.gen-1, radialThresh, gradientRate, hueVary, satVary, brightVary);
+    }
+    
+    this.update = function(t) {
+      this.t = map(Math.sin(this.off + this.speed * t), -1, 1, this.mint, this.maxt);
+      if (this.gen > 0) {
+        this.child1.update(t);
+        this.child2.update(t);
+      }
+    }
+  }  
+
+  let shard;
+  let currentSeed;
+  let T=0;
   
-  // setup() initializes p5 and the canvas element, can be mostly ignored in our case (check draw())
+  // =========== SETUP =========== //
   const setup = (p5, canvasParentRef) => {
-    canvasRef.current = p5;
-  
+
     // Keep reference of canvas element for snapshots
-    p5.createCanvas(width, height, p5.WEBGL).parent(canvasParentRef);
-    p5.colorMode(p5.HSB, 360, 100, 100, 1)
-    pg = p5.createGraphics(width, height, p5.P2D);    
-    shady = p5.createShader(vert_shader, frag_shader);
-      
+    p5.createCanvas(width, height).parent(canvasParentRef);
+    canvasRef.current = p5;
+
     attributesRef.current = () => {
       return {
         // This is called when the final image is generated, when creator opens the Mint NFT modal.
@@ -110,7 +116,7 @@ const CustomStyle = ({
         attributes: [
           {
             display_type: 'number',
-            trait_type: 'your trait here number',
+            trait_type: 'Number of recursions',
             value: hoistedValue.current, // using the hoisted value from within the draw() method, stored in the ref.
           },
           {
@@ -122,101 +128,195 @@ const CustomStyle = ({
     };
   };
 
-  // draw() is called right after setup and in a loop
-  // disabling the loop prevents controls from working correctly
-  // code must be deterministic so every loop instance results in the same output
-
-  // Basic example of a drawing something using:
-  // a) the block hash as initial seed (shuffleBag)
-  // b) individual transactions in a block (seed)
-  // c) custom parameters creators can customize (mod1, color1)
-  // d) final drawing reacting to screen resizing (M)
   const draw = (p5) => {
-    let WIDTH = width;
-    let HEIGHT = height;
-    let DIM = Math.min(WIDTH, HEIGHT);
-    let M = DIM / DEFAULT_SIZE;
-
-    if (pg.width != width || pg.height != height) {
-      pg = p5.createGraphics(width, height, p5.P2D);    
-    }
+    let R = Math.sqrt(width * width + height * height);
+    let cx = width/2;
+    let cy = height/2;
+    let dR = 0.5;
+    let dA = 0.002;
+    let minR = 1;
+    let minA = 0.001;
     
     let seed = parseInt(hash.slice(0, 16), 16);
     shuffleBag.current = new MersenneTwister(seed);
 
-    function perturbColor(col, h, s, b) {
-      var h2 = p5.floor(p5.hue(col) + p5.map(shuffleBag.current.random(), 0, 1, -h, h) + 360) % 360;
-      var s2 = p5.floor(p5.saturation(col) + p5.map(shuffleBag.current.random(), 0, 1, -s, s) + 100) % 100;
-      var b2 = p5.floor(p5.brightness(col) + p5.map(shuffleBag.current.random(), 0, 1, -b, b) + 100) % 100;
-      return p5.color(h2, s2, b2);
+    let numRecursionsDice = rand(0, 1);
+    if (numRecursionsDice > 0.9) {
+      var numRecursions = 11;
+      var recursionDampenGradient = 0.5;
+    } else if (numRecursionsDice > 0.5) {
+      var numRecursions = 10;
+      var recursionDampenGradient = 0.75;
+    } else {
+      var numRecursions = 9;
+      var recursionDampenGradient = 1.0;
     }
+
+    var gradientRate = rand(0.85, 1.0);
+    var gradientMinArea = 0.015;
+    var gradientMaxArea = 0.055; 
+    gradientRate *= recursionDampenGradient;
+    gradientMinArea *= (1.0/recursionDampenGradient);
+    gradientMaxArea *= (1.0/recursionDampenGradient);
+    
+    var decayTriggerProb = rand(0.035, 0.3);
+    var radialThresh = rand(0.05, 0.66);
+    
+    var radialDice = rand(0, 1);
+    if (radialDice < 0.01) {
+      radialThresh = 0.0;
+    } else if (radialDice < 0.02) {
+      radialThresh = 1.0;
+    } 
+        
+    var hueVary = rand(5.0, p5.map(numRecursions, 9, 12, 8, 5));
+    var satVary = rand(5.0, p5.map(numRecursions, 9, 12, 25, 12));
+    var brightVary = rand(5.0, p5.map(numRecursions, 9, 12, 35, 20));
+    
+    var ang0 = rand(0, 2.0 * Math.PI);
+    var baseColor = [rand(0, 360), rand(40, 100), rand(30, 100)];    
+    
+    shard = new Shard(baseColor, numRecursions, radialThresh, gradientRate, hueVary, satVary, brightVary);
+
+    if (currentSeed != seed) {
+      currentSeed = seed;
+      T = 0;
+    }
+
+    var speed = p5.map(mod2 < 1e-3 ? 0 : mod2, 0, 1, 0, p5.map(mod1, 0.0, 1.0, 0.001, 0.022));
+    T += speed;
+    shard.update(T);
+    
+    // =========== SEGMENT ============ //
+    function drawSegment(s, rad1, rad2, ang1, ang2, fill, stroke) {
+      let area = (rad2-rad1) * (ang2-ang1) / R;
+      let strokeStyleAlpha = p5.constrain(p5.map(area, 0, 0.025, 0.1, 1), 0.1, 1);
+      let lineWidth = p5.map(area, 0, 0.1, R/2750, R/1000 );
   
-    function subdivide(rects, n, x, y, w, h, col, thresh) {
-      if (n==0) {
-        var col2 = p5.color(p5.hue(col), p5.saturation(col), p5.brightness(col) * shuffleBag.current.random(), 0.5 * shuffleBag.current.random());
-        rects.push(new Rect(x, y, w, h, col, col2));
+      let areaRatio = 0;
+      if (s.gradient) {
+        areaRatio = p5.constrain((area - gradientMinArea)/(gradientMaxArea - gradientMinArea), 0, 1);
+      }
+      if (s.gradient && areaRatio > 0) {
+        var colG = [
+          p5.lerp(s.col[0], s.col2[0], areaRatio),
+          p5.lerp(s.col[1], s.col2[1], areaRatio),
+          p5.lerp(s.col[2], s.col2[2], areaRatio)
+        ]
+        var grd = p5.drawingContext.createRadialGradient(width/2, height/2, rad1, width/2, height/2, rad2);
+        grd.addColorStop(0, colorToHTML(s.col, 1.0));
+        grd.addColorStop(1, colorToHTML(colG, 1.0));
+        p5.drawingContext.fillStyle = grd;
+      }
+      else {
+        p5.drawingContext.fillStyle = colorToHTML(s.col, 1.0);
+      }
+
+      p5.drawingContext.strokeStyle = colorToHTML(s.col2, strokeStyleAlpha);      
+      p5.drawingContext.lineWidth = lineWidth;
+      p5.drawingContext.beginPath();
+      p5.drawingContext.arc(cx, cy, rad2, ang1+ang0, ang2+ang0, false);
+      p5.drawingContext.lineTo(cx + rad1 * Math.cos(ang2+ang0), cy + rad1 * Math.sin(ang2+ang0));
+      p5.drawingContext.arc(cx, cy, rad1, ang2+ang0, ang1+ang0, true); 
+      p5.drawingContext.lineTo(cx + rad2 * Math.cos(ang1+ang0), cy + rad2 * Math.sin(ang1+ang0));
+      if (fill) {
+        p5.drawingContext.fill();
+      }
+      if (stroke) {        
+        p5.drawingContext.stroke();  
+      }
+      p5.drawingContext.closePath();
+    }
+
+    // =========== SHARD ============ //
+    function drawShard(s, rad1, rad2, ang1, ang2, fill, stroke, decayTrigger) {
+      if (s.gen == 0) {
+        var r = rad1 + rad2;
+        if (Math.abs(rad1-rad2) > minR && Math.abs(ang1-ang2) > minA) {
+          drawSegment(s, 
+            rad1, rad2, ang1+ang0, ang2+ang0, 
+            decayTrigger ? !fill : fill, 
+            decayTrigger ? !stroke: stroke
+          );
+        }
       } 
       else {
-        var newcol1 = perturbColor(col, n, n*2, n*3);
-        var newcol2 = perturbColor(col, n, n*2, n*3);  
-        //var t = p5.random(1);
-        var t = Math.pow(shuffleBag.current.random(), 0.5+mod2);
-        var horiz = shuffleBag.current.random() > thresh ? true : false;
-        if (horiz) {
-          subdivide(rects, n-1, x, y, w, h*t, newcol1, thresh);
-          subdivide(rects, n-1, x, y+h*t, w, h*(1-t), newcol2, thresh);
-        } else {
-          subdivide(rects, n-1, x, y, w*t, h, newcol1, thresh);
-          subdivide(rects, n-1, x+w*t, y, w*(1-t), h, newcol2, thresh);  
-        }      
+        if (s.radial) {
+          decayTrigger = decayTrigger || dice(decayTriggerProb);
+          drawShard(s.child1, rad1, rad1 + s.t * (rad2 - rad1) + dR, ang1, ang2, fill, stroke, decayTrigger);
+          drawShard(s.child2, rad1 + s.t * (rad2 - rad1), rad2, ang1, ang2, fill, stroke, decayTrigger);
+        } 
+        else {
+          drawShard(s.child1, rad1, rad2, ang1, ang1 + s.t * (ang2 - ang1) + dA, fill, stroke, decayTrigger);
+          drawShard(s.child2, rad1, rad2, ang1 + s.t * (ang2 - ang1), ang2, fill, stroke, decayTrigger);  
+        }
       }
     }
-  
-    rects = [];
+
+    // draw background gradient
+    p5.colorMode(p5.HSB, 360, 100, 100);
+    p5.background(baseColor);
     
-    var base = p5.color(
-      p5.map((shuffleBag.current.random() + 0.25 * mod1) % 1.0, 0, 1, 0, 360),
-      p5.map(shuffleBag.current.random(), 0, 1, 60, 100),
-      p5.map(shuffleBag.current.random(), 0, 1, 60, 100)
+    let grd = p5.drawingContext.createRadialGradient(width/2, height/2, rand(R/5, R/3), width/2, height/2, rand(R/2, 2*R/3));
+
+    let bg1 = baseColor;
+    //let bg2 = perturbColor(baseColor, 10, 30, 30);
+
+    let bg2 = [
+      baseColor[0] + rand(-10, 10),
+      baseColor[1] + (baseColor[1] > 50? -1 : 1) * rand(20, 30),
+      baseColor[2] + (baseColor[2] > 50? -1 : 1) * rand(20, 30)
+    ]
+
+    if (dice(0.5)) {
+      grd.addColorStop(0, p5.color(bg1));
+      grd.addColorStop(1, p5.color(bg2));
+    } else {
+      grd.addColorStop(0, p5.color(bg2));
+      grd.addColorStop(1, p5.color(bg1));
+    }
+    p5.drawingContext.fillStyle = grd;
+    p5.drawingContext.fillRect(-1, -1, width+1, height+1);
+
+    let decayTrigger = dice(decayTriggerProb);
+
+    drawShard(shard, 
+      0, R, 
+      0, 2.0 * Math.PI, 
+      false, true, 
+      decayTrigger
     );
 
-    var N = 9 + Math.floor(3 * shuffleBag.current.random());
-    var thresh = 0.1 + 0.8 * shuffleBag.current.random();
-    subdivide(rects, N, 0, 0, width, height, base, thresh);
+    // framerate
+    p5.stroke(0);
+    p5.fill(0);
+    p5.textSize(20);
 
-    pg.clear();
-    pg.background(0);
-    pg.colorMode(p5.HSB, 360, 100, 100, 1);
-    for (var r=0; r<rects.length; r++) {
-      pg.fill(rects[r].col);
-      pg.noStroke();
-      // pg.stroke(rects[r].col2);
-      // p5.strokeWeight(0.25);
-      pg.rect(rects[r].x, rects[r].y, rects[r].w, rects[r].h);
-    }
-    p5.shader(shady);
-    shady.setUniform('tex0', pg);
-    p5.noStroke();
-    p5.rect(0, 0, width, height);
-    //p5.image(pg, -width/2, -height/2, width, height);
+    if (radialDice < 0.01) {
+      p5.text("*", 100, 20);
+    } else if (radialDice < 0.02) {
+      p5.text("**", 100, 20);
+    } 
+    
+    p5.text(Math.floor(p5.frameRate())+ " fps ("+numRecursions+")", 2, 20);
 
     // example assignment of hoisted value to be used as NFT attribute later
-    hoistedValue.current = 42;
+    hoistedValue.current = numRecursions;
   };
 
-  return <Sketch setup={setup} draw={draw} preload={preload} windowResized={handleResize} />;
+  return <Sketch setup={setup} draw={draw} windowResized={handleResize} />;
 };
 
 export default CustomStyle;
 
 const styleMetadata = {
-  name: '',
+  name: 'Turntables',
   description: '',
   image: '',
   creator_name: '',
   options: {
     mod1: 0.5,
-    mod2: 0.5
+    mod2: 0.0
   },
 };
 
