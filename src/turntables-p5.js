@@ -4,7 +4,6 @@ import MersenneTwister from 'mersenne-twister';
 import { randFloatSpread } from 'three/src/math/MathUtils';
 
 
-let T=0;
 
 let DEFAULT_SIZE = 500;
 const CustomStyle = ({
@@ -66,9 +65,9 @@ const CustomStyle = ({
   let minAreaGradient;
   let maxAreaGradient;
 
-
   let currentSeed;
-  
+  let T=0;
+
   
   // =========== SETUP =========== //
   const setup = (p5, canvasParentRef) => {
@@ -267,16 +266,9 @@ const CustomStyle = ({
     let seed = parseInt(hash.slice(0, 16), 16);
     shuffleBag.current = new MersenneTwister(seed);
     
-    if (currentSeed === undefined) {
-      console.log("UNDEFINED TIME!!!")
-    } else {
-      console.log("current "+currentSeed);
-    }
-
-
     if (currentSeed != seed) {
       currentSeed = seed;
-      // T = 0;
+      T = 0;
 
       radialThresh = rand(0.35, 0.9);      
       var radialDice = rand(0, 1);
