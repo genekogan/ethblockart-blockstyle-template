@@ -4,6 +4,40 @@ import MersenneTwister from 'mersenne-twister';
 import { randFloatSpread } from 'three/src/math/MathUtils';
 
 
+let shard;
+
+let recursionDampenGradient;
+let numRecursions;
+let gradientRate;
+
+let decayTriggerProb;
+let radialThresh;
+let hueVary;
+let satVary;
+let brightVary;
+let ang0;
+let baseColor;  
+
+let grd1R;
+let grd2R;
+let hueMargin;
+let satMargin;
+let brightMargin;
+let grdInverted;
+let decayTrigger;
+    
+let minArea;
+let minR;
+let minA;
+let maxR;
+let maxA;
+let maxArea;
+let minAreaGradient;
+let maxAreaGradient;
+
+let currentSeed;
+let T=0;
+
 
 let DEFAULT_SIZE = 500;
 const CustomStyle = ({
@@ -33,40 +67,6 @@ const CustomStyle = ({
   function map(input, from1, to1, from2, to2) {
     return from2 + (to2-from2) * (input-from1) / (to1-from1);
   }
-
-  let shard;
-
-  let recursionDampenGradient;
-  let numRecursions;
-  let gradientRate;
-
-  let decayTriggerProb;
-  let radialThresh;
-  let hueVary;
-  let satVary;
-  let brightVary;
-  let ang0;
-  let baseColor;  
-
-  let grd1R;
-  let grd2R;
-  let hueMargin;
-  let satMargin;
-  let brightMargin;
-  let grdInverted;
-  let decayTrigger;
-      
-  let minArea;
-  let minR;
-  let minA;
-  let maxR;
-  let maxA;
-  let maxArea;
-  let minAreaGradient;
-  let maxAreaGradient;
-
-  let currentSeed;
-  let T=0;
 
   
   // =========== SETUP =========== //
@@ -196,8 +196,6 @@ const CustomStyle = ({
       }
   
       this.gradient = dice(gradientRate);
-      this.mint = 0.40 * mod1;
-      this.maxt = 1.0 - 0.4 * mod1;
 
       this.mindR = -0.1;
       this.maxdR = 0.1;
@@ -220,13 +218,16 @@ const CustomStyle = ({
         this.child2 = new Shard(col2, this.gen-1, radialThresh, gradientRate, hueVary, satVary, brightVary, decayTrigger_);
       }
       
-      this.update = function(t) {
+      this.update = function(t, mod1) {
+        this.mint = 0.40 * mod1;
+        this.maxt = 1.0 - 0.4 * mod1;
+
         this.t = map(Math.sin(this.off1 + this.speed * t), -1, 1, this.mint, this.maxt);
         this.dR = map(Math.sin(this.off2 + this.speed * t), -1, 1, this.mindR, this.maxdR);
         this.dA = map(Math.sin(this.off3 + this.speed * t), -1, 1, this.mindA, this.maxdA);
         if (this.gen > 0) {
-          this.child1.update(t);
-          this.child2.update(t);
+          this.child1.update(t, mod1);
+          this.child2.update(t, mod1);
         }
       }
     }  
@@ -336,7 +337,7 @@ const CustomStyle = ({
     
 
     // console.log("update " +T + " "+p5.frameCount)
-    shard.update(T);
+    shard.update(T, mod1);
     
     p5.colorMode(p5.HSB, 360, 100, 100);
     p5.background(baseColor);
