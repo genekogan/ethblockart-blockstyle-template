@@ -294,7 +294,7 @@ const CustomStyle = ({
       gradientRate = rand(0.5, 0.85);
       gradientRate *= recursionDampenGradient;
 
-      decayTriggerProb = rand(0.135, 0.35);
+      decayTriggerProb = rand(0.135, 0.325);
 
       let minThreshMult = 0.0;
       if (numRecursions == 11){
@@ -317,8 +317,8 @@ const CustomStyle = ({
       grd1R = rand(R/5, R/3);
       grd2R = rand(R/2, 2*R/3);
       hueMargin = rand(-25, 25);
-      satMargin = rand(15, 30);
-      brightMargin = rand(15, 30);
+      satMargin = rand(15, 35);
+      brightMargin = rand(20, 40);
       grdInverted = dice(0.5);
       decayTrigger = dice(decayTriggerProb);    
 
@@ -347,8 +347,8 @@ const CustomStyle = ({
     let bg1 = baseColor;
     let bg2 = p5.color([
       (p5.hue(baseColor) + hueMargin) % 360,
-      p5.brightness(baseColor) + (p5.brightness(baseColor) > 50? -1 : 1) * satMargin,
-      p5.saturation(baseColor) + (p5.saturation(baseColor) > 50? -1 : 1) * brightMargin
+      p5.saturation(baseColor) + (p5.saturation(baseColor) > 50? -1 : 1) * satMargin,
+      p5.brightness(baseColor) + (p5.brightness(baseColor) > 50? -1 : 1) * brightMargin
     ])
 
     if (grdInverted) {
@@ -367,17 +367,15 @@ const CustomStyle = ({
       false, true
     );
 
-    // // framerate
+    // framerate
     // p5.stroke(0);
     // p5.fill(0);
     // p5.textSize(20);
-
-    // if (radialDice < 0.01) {
+    // if (radialThresh == 0.0) {
     //   p5.text("*", 100, 20);
-    // } else if (radialDice < 0.02) {
+    // } else if (radialThresh == 1.0) {
     //   p5.text("**", 100, 20);
-    // } 
-    
+    // }     
     // p5.text(Math.floor(p5.frameRate())+ " fps ("+numRecursions+")", 2, 20);
 
 
